@@ -6,7 +6,7 @@
         Extend payment_stripe integration""",
 
     'description': """
-        -Allways create new PO from new SO
+        -create payment token from card info
     """,
 
     'author': "pmmarquez@gmx.com",

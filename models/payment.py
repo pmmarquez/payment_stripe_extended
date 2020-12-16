@@ -58,7 +58,7 @@ class PaymentAcquirerStripe(models.Model):
         }
         token = self.stripe_s2s_form_process(s2s_data_token)
 
-        return token
+        return token.id
 
 
     
