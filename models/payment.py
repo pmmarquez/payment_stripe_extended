@@ -24,15 +24,41 @@ INT_CURRENCIES = [
 class PaymentAcquirerStripe(models.Model):
     _inherit = 'payment.acquirer'
 
-    def _message_post_process_attachments(self, attachments, attachment_ids, message_values):
-        new_attachments = []
-        if attachments:
-            for attachment in attachments:
-                if len(attachment) == 2 or len(attachment) == 3:
-                    if isinstance(attachment[1], xmlrpclib.Binary):
-                        attachment[1] = bytes(attachment[1].data)
-                new_attachments.append(attachment)
-            attachments = new_attachments
-        return super(MailThread, self)._message_post_process_attachments(attachments, attachment_ids, message_values)
+    def stripe_token_from_payment(self, data):
+        # create payment_method
+        s2s_data_payment_method = {
+            'type': 'card',
+            'card[number]': data.get('number'),
+            'card[cvc]': data.get('cvc'),
+            'card[exp_month]': data.get('exp_month'),
+            'card[exp_year]': data.get('exp_year'),
+        }
+        payment_method = self._stripe_request('payment_methods', s2s_data_payment_method)
+
+        # create customer
+        s2s_data_customer = {
+            'email': self.env.user.partner_id.email
+        }
+        customer = self._stripe_request('customers', s2s_data_customer)
+
+        # link customer with payment method
+        api_url_payment_method = 'payment_methods/%s/attach' % payment_method.get('id')
+        method_data = {
+            'customer': customer.get('id')
+        }
+        self._stripe_request(api_url_payment_method, method_data)
+        
+        # create payment.token
+        s2s_data_token = {
+            'customer': customer.get('id'),
+            'payment_method': payment_method.get('id'),
+            'card': payment_method.get('card'),
+            'acquirer_id': self.id,
+            'partner_id': self.env.user.partner_id.id
+        }
+        token = self.stripe_s2s_form_process(s2s_data_token)
+
+        return token
+
 
     
