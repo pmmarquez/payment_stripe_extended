@@ -37,6 +37,7 @@ class PaymentAcquirerStripe(models.Model):
 
         # create customer
         s2s_data_customer = {
+            'name': self.env.user.partner_id.name,
             'email': self.env.user.partner_id.email
         }
         customer = self._stripe_request('customers', s2s_data_customer)
@@ -49,16 +50,20 @@ class PaymentAcquirerStripe(models.Model):
         self._stripe_request(api_url_payment_method, method_data)
         
         # create payment.token
-        s2s_data_token = {
-            'customer': customer.get('id'),
-            'payment_method': payment_method.get('id'),
-            'card': payment_method.get('card'),
-            'acquirer_id': self.id,
-            'partner_id': self.env.user.partner_id.id
-        }
-        token = self.stripe_s2s_form_process(s2s_data_token)
+        if customer.get('id') and payment_method.get('id'):
+            s2s_data_token = {
+                'customer': customer.get('id'),
+                'payment_method': payment_method.get('id'),
+                'card': payment_method.get('card'),
+                'acquirer_id': self.id,
+                'partner_id': self.env.user.partner_id.id
+            }
+            token = self.stripe_s2s_form_process(s2s_data_token)
 
-        return token.id
+        if token.id:
+            return token.id
+        else:
+            return False
 
 
     
