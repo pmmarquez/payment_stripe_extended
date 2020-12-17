@@ -7,7 +7,8 @@
 
     'description': """
         -create payment token from card info
-        - stripe invoice payment
+        -stripe invoice payment
+        -notify client on payment transaction status
     """,
 
     'author': "pmmarquez@gmx.com",

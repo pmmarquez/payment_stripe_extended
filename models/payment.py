@@ -65,5 +65,23 @@ class PaymentAcquirerStripe(models.Model):
         else:
             return False
 
+class PaymentTransactionStripe(models.Model):
+    _inherit = 'payment.transaction'
 
+    def _set_transaction_done(self):
+        super(PaymentTransactionStripe, self)._set_transaction_done()
+        self.env['bus.bus'].sendone(
+            self._cr.dbname + '_' + str(self.partner_id.id),
+            {'type': 'payment_transaction_notification', 'action':'successed', "transaction_id":self.id, "reference":self.reference, "amount":self.amount})
     
+    def _set_transaction_cancel(self):
+        super(PaymentTransactionStripe, self)._set_transaction_cancel()
+        self.env['bus.bus'].sendone(
+            self._cr.dbname + '_' + str(self.partner_id.id),
+            {'type': 'payment_transaction_notification', 'action':'cancelled', "transaction_id":self.id, "reference":self.reference, "amount":self.amount})
+    
+    def _set_transaction_error(self, msg):
+        super(PaymentTransactionStripe, self)._set_transaction_error(msg)
+        self.env['bus.bus'].sendone(
+            self._cr.dbname + '_' + str(self.partner_id.id),
+            {'type': 'payment_transaction_notification', 'action':'error', "transaction_id":self.id, "reference":self.reference, "amount":self.amount, "message":self.state_message})
