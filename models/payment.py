@@ -59,8 +59,6 @@ class PaymentAcquirerStripe(models.Model):
                 'partner_id': self.env.user.partner_id.id
             }
             token = self.stripe_s2s_form_process(s2s_data_token)
-
-        if token.id:
             return token.id
         else:
             return False
