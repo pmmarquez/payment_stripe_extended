@@ -63,12 +63,12 @@ class PaymentAcquirerStripe(models.Model):
         else:
             return False
     
-    def stripe_transfer(self, amount, currency, account_id):
+    def stripe_transfer(self, data):
         # create transfer object
         s2s_data_transfer = {
-            "amount": amount,
-            "currency": currency,
-            "destination": account_id
+            "amount": data.get('amount'),
+            "currency": data.get('currency'),
+            "destination": data.get('account_id')
         }
         transfer = self._stripe_request('transfers', s2s_data_transfer)
         # return transfer id
