@@ -62,6 +62,23 @@ class PaymentAcquirerStripe(models.Model):
             return token.id
         else:
             return False
+    
+    def stripe_transfer(self, amount, currency, account_id):
+        # create transfer object
+        s2s_data_transfer = {
+            "amount": amount,
+            "currency": currency,
+            "destination": account_id
+        }
+        transfer = self._stripe_request('transfers', s2s_data_transfer)
+        # return transfer id
+        if transfer.get('id'):
+            self.env['bus.bus'].sendone(
+                self._cr.dbname + '_' + str(self.id),
+                {'type': 'stripe_transfer_vendor_notification', 'action':'created', "account_id":transfer.get('id')})
+            return transfer.get('id')
+        else:
+            return False
 
 class PaymentTransactionStripe(models.Model):
     _inherit = 'payment.transaction'
