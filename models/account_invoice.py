@@ -33,8 +33,9 @@ class AccountMove(models.Model):
         purchase_order = self.env['purchase.order'].search([('name','ilike',self.invoice_origin)])
         client_invoice = self.env['account.move'].search([('invoice_origin','ilike',purchase_order.origin)])
         # stripe transfer
+        # self.amount_tota
         s2s_data_transfer = {
-            "amount": int(float_round(self.amount_total * 100, 2)),
+            "amount": int(float_round(40.00 * 100, 2)),
             "currency": self.currency_id.name,
             "destination": self.partner_id.stripe_connect_account_id,
             "transfer_group": self.env['payment.transaction'].search([('id','=',client_invoice.transaction_ids.id)]).reference,
