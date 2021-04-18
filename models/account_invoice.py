@@ -3,17 +3,14 @@
 
 from odoo import api, fields, models, _, SUPERUSER_ID
 from odoo.tests import Form
-from odoo.exceptions import RedirectWarning, UserError, ValidationError, AccessError
-from odoo.tools.misc import formatLang, format_date, get_lang
-from odoo.tools import float_is_zero, float_compare, safe_eval, date_utils, email_split, email_escape_char, email_re
-
+from odoo.tools.float_utils import float_round
 
 from datetime import date, timedelta
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
 
-    def stripe_pay_invoice(self, payment_token_id):
+    def cliente_stripe_pay_invoice(self, payment_token_id):
         payment_token = self.env['payment.token'].browse(payment_token_id)
         action = self.action_invoice_register_payment()
         # .with_user(SUPERUSER_ID)
@@ -27,3 +24,35 @@ class AccountMove(models.Model):
         payment = payment_form.save()
         payment.post()
         return payment.payment_transaction_id.id
+
+    def pay_vendor_invoice(self):
+        payment_stripe = self.env['payment.acquirer'].search([('provider', '=', 'stripe')])
+        action = self.action_invoice_register_payment()
+        # .with_user(SUPERUSER_ID)
+        payment_form = Form(self.env['account.payment'].with_context(action['context']), view='account.view_account_payment_invoice_form')
+        purchase_order = self.env['purchase.order'].search([('name','ilike',self.invoice_origin)])
+        client_invoice = self.env['account.move'].search([('invoice_origin','ilike',purchase_order.origin)])
+        # stripe transfer
+        s2s_data_transfer = {
+            "amount": int(float_round(self.amount_total * 100, 2)),
+            "currency": self.currency_id.name,
+            "destination": self.partner_id.stripe_connect_account_id,
+            "transfer_group": self.env['payment.transaction'].search([('id','in',client_invoice.transaction_ids)]).reference,
+        }
+        transfer = payment_stripe._stripe_request('transfers', s2s_data_transfer)
+        # return transfer info
+        if transfer.get('id'):
+            payment = payment_form.save()
+            payment.post()
+            
+            return_transaction_info = {
+                'odoo_payment_id':payment.id,
+                'stripe_transfer_id': transfer.get('id')
+            }
+
+            self.env['bus.bus'].sendone(
+                self._cr.dbname + '_' + str(self.partner_id.id),
+                {'type': 'stripe_transfer_vendor_notification', 'action':'created', "transaction_info":return_transaction_info})
+            return return_transaction_info
+        else:
+            return False

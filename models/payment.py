@@ -68,8 +68,8 @@ class PaymentAcquirerStripe(models.Model):
         s2s_data_transfer = {
             "amount": data.get('amount'),
             "currency": data.get('currency'),
-            "source_transaction": data.get('payment_id'),
-            "destination": data.get('account_id')
+            "destination": data.get('account_id'),
+            "transfer_group": data.get('transfer_group'),
         }
         transfer = self._stripe_request('transfers', s2s_data_transfer)
         # return transfer id
@@ -83,6 +83,34 @@ class PaymentAcquirerStripe(models.Model):
 
 class PaymentTransactionStripe(models.Model):
     _inherit = 'payment.transaction'
+
+    # the same as the original method just adding transfer_group property to link futures payouts to vendors
+    def _stripe_create_payment_intent(self, acquirer_ref=None, email=None):
+        if not self.payment_token_id.stripe_payment_method:
+            # old token before using sca, need to fetch data from the api
+            self.payment_token_id._stripe_sca_migrate_customer()
+
+        charge_params = {
+            'amount': int(self.amount if self.currency_id.name in INT_CURRENCIES else float_round(self.amount * 100, 2)),
+            'currency': self.currency_id.name.lower(),
+            'off_session': True,
+            'confirm': True,
+            'payment_method': self.payment_token_id.stripe_payment_method,
+            'customer': self.payment_token_id.acquirer_ref,
+            "description": self.reference,
+            "transfer_group": self.reference, 
+        }
+
+        if not self.env.context.get('off_session'):
+            charge_params.update(setup_future_usage='off_session', off_session=False)
+        _logger.info('_stripe_create_payment_intent: Sending values to stripe, values:\n%s', pprint.pformat(charge_params))
+
+        res = self.acquirer_id._stripe_request('payment_intents', charge_params)
+        if res.get('charges') and res.get('charges').get('total_count'):
+            res = res.get('charges').get('data')[0]
+
+        _logger.info('_stripe_create_payment_intent: Values received:\n%s', pprint.pformat(res))
+        return res
 
     def _set_transaction_done(self):
         super(PaymentTransactionStripe, self)._set_transaction_done()
