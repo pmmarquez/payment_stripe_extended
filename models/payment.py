@@ -84,6 +84,8 @@ class PaymentAcquirerStripe(models.Model):
 class PaymentTransactionStripe(models.Model):
     _inherit = 'payment.transaction'
 
+    stripe_payment_intent_charge_id = fields.Char(string='Stripe Payment Intent Charge ID')
+
     # the same as the original method just adding transfer_group property to link futures payouts to vendors
     def _stripe_create_payment_intent(self, acquirer_ref=None, email=None):
         if not self.payment_token_id.stripe_payment_method:
@@ -108,6 +110,7 @@ class PaymentTransactionStripe(models.Model):
         res = self.acquirer_id._stripe_request('payment_intents', charge_params)
         if res.get('charges') and res.get('charges').get('total_count'):
             res = res.get('charges').get('data')[0]
+            self.stripe_payment_intent_charge_id = res.id
 
         _logger.info('_stripe_create_payment_intent: Values received:\n%s', pprint.pformat(res))
         return res

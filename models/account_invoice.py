@@ -32,13 +32,14 @@ class AccountMove(models.Model):
         payment_form = Form(self.env['account.payment'].with_context(action['context']), view='account.view_account_payment_invoice_form')
         purchase_order = self.env['purchase.order'].search([('name','ilike',self.invoice_origin)])
         client_invoice = self.env['account.move'].search([('invoice_origin','ilike',purchase_order.origin)])
+        client_payment_transaction = self.env['payment.transaction'].search([('id','=',client_invoice.transaction_ids.id)])
         # stripe transfer
-        # self.amount_tota
         s2s_data_transfer = {
-            "amount": int(float_round(40.00 * 100, 2)),
+            "amount": int(float_round(self.amount_total * 100, 2)),
             "currency": self.currency_id.name,
             "destination": self.partner_id.stripe_connect_account_id,
-            "transfer_group": self.env['payment.transaction'].search([('id','=',client_invoice.transaction_ids.id)]).reference,
+            "source_transaction": client_payment_transaction.stripe_payment_intent_charge_id,
+            "transfer_group": client_payment_transaction.reference,
         }
         transfer = payment_stripe._stripe_request('transfers', s2s_data_transfer)
         # return transfer info
