@@ -110,7 +110,7 @@ class PaymentTransactionStripe(models.Model):
         res = self.acquirer_id._stripe_request('payment_intents', charge_params)
         if res.get('charges') and res.get('charges').get('total_count'):
             res = res.get('charges').get('data')[0]
-            self.stripe_payment_intent_charge_id = res.id
+            self.stripe_payment_intent_charge_id = res.get('id')
 
         _logger.info('_stripe_create_payment_intent: Values received:\n%s', pprint.pformat(res))
         return res
