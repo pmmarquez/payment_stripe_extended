@@ -68,8 +68,8 @@ class PaymentAcquirerStripe(models.Model):
         s2s_data_transfer = {
             "amount": data.get('amount'),
             "currency": data.get('currency'),
-            "destination": data.get('account_id'),
-            "transfer_group": data.get('transfer_group'),
+            "source_transaction": data.get('charge_id'),
+            "destination": data.get('account_id')
         }
         transfer = self._stripe_request('transfers', s2s_data_transfer)
         # return transfer id
