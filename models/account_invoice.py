@@ -7,16 +7,22 @@ from odoo.tools.float_utils import float_round
 
 from datetime import date, timedelta
 
+
 class AccountMove(models.Model):
     _inherit = 'account.move'
+
+    has_complaint = fields.Boolean(default=False)
+    complaint_description = fields.Text("Complaint detailed description")
+    complaint_approved = fields.Boolean(default=False)
 
     def cliente_stripe_pay_invoice(self, payment_token_id):
         payment_token = self.env['payment.token'].browse(payment_token_id)
         action = self.action_invoice_register_payment()
         # .with_user(SUPERUSER_ID)
-        payment_form = Form(self.env['account.payment'].with_context(action['context']), view='account.view_account_payment_invoice_form')
+        payment_form = Form(self.env['account.payment'].with_context(
+            action['context']), view='account.view_account_payment_invoice_form')
         payment_form._values['journal_id'] = payment_token.acquirer_id.journal_id.id
-        for payment_method in payment_token.acquirer_id.journal_id.inbound_payment_method_ids :
+        for payment_method in payment_token.acquirer_id.journal_id.inbound_payment_method_ids:
             if payment_method.code == 'electronic':
                 payment_form._values['payment_method_id'] = payment_method.id
                 payment_form._values['payment_method_code'] = 'electronic'
@@ -26,13 +32,18 @@ class AccountMove(models.Model):
         return payment.payment_transaction_id.id
 
     def pay_vendor_invoice(self):
-        payment_stripe = self.env['payment.acquirer'].search([('provider', '=', 'stripe')])
+        payment_stripe = self.env['payment.acquirer'].search(
+            [('provider', '=', 'stripe')])
         action = self.action_invoice_register_payment()
         # .with_user(SUPERUSER_ID)
-        payment_form = Form(self.env['account.payment'].with_context(action['context']), view='account.view_account_payment_invoice_form')
-        purchase_order = self.env['purchase.order'].search([('name','ilike',self.invoice_origin)])
-        client_invoice = self.env['account.move'].search([('invoice_origin','ilike',purchase_order.origin)])
-        client_payment_transaction = self.env['payment.transaction'].search([('id','=',client_invoice.transaction_ids.id)])
+        payment_form = Form(self.env['account.payment'].with_context(
+            action['context']), view='account.view_account_payment_invoice_form')
+        purchase_order = self.env['purchase.order'].search(
+            [('name', 'ilike', self.invoice_origin)])
+        client_invoice = self.env['account.move'].search(
+            [('invoice_origin', 'ilike', purchase_order.origin)])
+        client_payment_transaction = self.env['payment.transaction'].search(
+            [('id', '=', client_invoice.transaction_ids.id)])
         # stripe transfer
         s2s_data_transfer = {
             "amount": int(float_round(self.amount_total * 100, 2)),
@@ -41,20 +52,21 @@ class AccountMove(models.Model):
             "source_transaction": client_payment_transaction.stripe_payment_intent_charge_id,
             "transfer_group": client_payment_transaction.reference,
         }
-        transfer = payment_stripe._stripe_request('transfers', s2s_data_transfer)
+        transfer = payment_stripe._stripe_request(
+            'transfers', s2s_data_transfer)
         # return transfer info
         if transfer.get('id'):
             payment = payment_form.save()
             payment.post()
-            
+
             return_transaction_info = {
-                'odoo_payment_id':payment.id,
+                'odoo_payment_id': payment.id,
                 'stripe_transfer_id': transfer.get('id')
             }
 
             self.env['bus.bus'].sendone(
                 self._cr.dbname + '_' + str(self.partner_id.id),
-                {'type': 'stripe_transfer_vendor_notification', 'action':'created', "transaction_info":return_transaction_info})
+                {'type': 'stripe_transfer_vendor_notification', 'action': 'created', "transaction_info": return_transaction_info})
             return return_transaction_info
         else:
             return False
