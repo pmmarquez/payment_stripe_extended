@@ -70,3 +70,21 @@ class AccountMove(models.Model):
             return return_transaction_info
         else:
             return False
+
+    def write(self, values):
+        if values.get('complaint_approved') == True:
+            payments = []
+            lines = self.env['account.move.line'].search(
+                [('in', 'in', self.line_ids)])
+
+            for line in lines:
+                if line.payment_id not in payments:
+                    payments.append(line.payment_id)
+
+            for payment in payments:
+                s2s_data_refound = {
+                    "charge": payment.payment_transaction_id.stripe_payment_intent_charge_id,
+                }
+
+        result = super(AccountMove, self).write(values)
+        return result
