@@ -72,6 +72,8 @@ class AccountMove(models.Model):
             return False
 
     def write(self, values):
+        payment_stripe = self.env['payment.acquirer'].search(
+            [('provider', '=', 'stripe')])
         if values.get('complaint_approved') == True:
             payments = []
             lines = self.env['account.move.line'].search(
@@ -85,6 +87,16 @@ class AccountMove(models.Model):
                 s2s_data_refound = {
                     "charge": payment.payment_transaction_id.stripe_payment_intent_charge_id,
                 }
+                refound = payment_stripe._stripe_request(
+                    'refunds', s2s_data_refound)
+                if refound.get('id'):
+                    return_refound_info = {
+                        'odoo_payment_id': payment.id,
+                        'stripe_refound_id': refound.get('id')
+                    }
+                    self.env['bus.bus'].sendone(
+                        self._cr.dbname + '_' + str(self.partner_id.id),
+                        {'type': 'stripe_refound_client_notification', 'action': 'created', "refound_info": return_refound_info})
 
         result = super(AccountMove, self).write(values)
         return result
