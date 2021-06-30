@@ -77,7 +77,7 @@ class AccountMove(models.Model):
         if values.get('complaint_approved') == True:
             payments = []
             lines = self.env['account.move.line'].search(
-                [('in', 'in', self.line_ids)])
+                [('id', 'in', self.line_ids)])
 
             for line in lines:
                 if line.payment_id not in payments:
