@@ -78,19 +78,20 @@ class AccountMove(models.Model):
             client_payment_transaction = self.env['payment.transaction'].search(
                 [('id', '=', self.transaction_ids.id)])
 
-            s2s_data_refound = {
-                "charge": client_payment_transaction.stripe_payment_intent_charge_id,
-            }
-            refound = payment_stripe._stripe_request(
-                'refunds', s2s_data_refound)
-            if refound.get('id'):
-                return_refound_info = {
-                    'odoo_invoice_id': self.id,
-                    'stripe_refound_id': refound.get('id')
+            if client_payment_transaction:
+                s2s_data_refound = {
+                    "charge": client_payment_transaction.stripe_payment_intent_charge_id,
                 }
-                self.env['bus.bus'].sendone(
-                    self._cr.dbname + '_' + str(self.partner_id.id),
-                    {'type': 'stripe_refound_client_notification', 'action': 'created', "refound_info": return_refound_info})
+                refound = payment_stripe._stripe_request(
+                    'refunds', s2s_data_refound)
+                if refound.get('id'):
+                    return_refound_info = {
+                        'odoo_invoice_id': self.id,
+                        'stripe_refound_id': refound.get('id')
+                    }
+                    self.env['bus.bus'].sendone(
+                        self._cr.dbname + '_' + str(self.partner_id.id),
+                        {'type': 'stripe_refound_client_notification', 'action': 'created', "refound_info": return_refound_info})
 
         result = super(AccountMove, self).write(values)
         return result
